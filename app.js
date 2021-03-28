@@ -23,7 +23,7 @@ const userSchema = new Schema({
   email: String,
   password: String,
 });
-
+// this is the encryption part
 const secret = process.env.SECRET;
 console.log(secret);
 userSchema.plugin(encrypt, { secret: secret, encryptedFields: ["password"] });
