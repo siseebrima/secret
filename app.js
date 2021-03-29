@@ -4,7 +4,11 @@ const express = require("express");
 const bodyParser = require("body-parser");
 const ejs = require("ejs");
 const mongoose = require("mongoose");
-const encrypt = require("mongoose-encryption");
+// const encrypt = require("mongoose-encryption");
+// const md5 = require("md5");
+const bcrypt = require("bcrypt");
+
+const saltRounds = 10;
 
 const { Schema } = mongoose;
 
@@ -24,9 +28,9 @@ const userSchema = new Schema({
   password: String,
 });
 // this is the encryption part
-const secret = process.env.SECRET;
-console.log(secret);
-userSchema.plugin(encrypt, { secret: secret, encryptedFields: ["password"] });
+// const secret = process.env.SECRET;
+// console.log(secret);
+// userSchema.plugin(encrypt, { secret: secret, encryptedFields: ["password"] });
 
 const User = new mongoose.model("User", userSchema);
 
@@ -51,32 +55,34 @@ app.get("/secrets", (req, res) => {
 });
 
 app.post("/register", (req, res) => {
-  // console.log(req.body);
-  const username = req.body.username;
-  const password = req.body.password;
+  bcrypt.hash(req.body.password, saltRounds, function (err, hash) {
+    const username = req.body.username;
+    const password = hash;
 
-  const newUser = new User({
-    email: username,
-    password: password,
-  });
+    const newUser = new User({
+      email: username,
+      password: password,
+    });
 
-  User.findOne({ email: username }, (err, user) => {
-    if (!err) {
-      if (user) {
-        res.send("There exists an account with that username");
+    User.findOne({ email: username }, (err, user) => {
+      if (!err) {
+        if (user) {
+          res.send("There exists an account with that username");
+        } else {
+          newUser.save((err) => {
+            if (err) {
+              console.log(err);
+            } else {
+              res.render("secrets");
+            }
+          });
+        }
       } else {
-        newUser.save((err) => {
-          if (err) {
-            console.log(err);
-          } else {
-            res.render("secrets");
-          }
-        });
+        res.send(err);
       }
-    } else {
-      res.send(err);
-    }
+    });
   });
+  // console.log(req.body);
 });
 
 app.post("/login", (req, res) => {
@@ -88,11 +94,19 @@ app.post("/login", (req, res) => {
       console.log(err);
     } else {
       if (user) {
-        if (user.password === password) {
-          res.render("secrets");
-        } else {
-          res.send("Password is incorrect, please try again");
-        }
+        bcrypt.compare(password, user.password, function (err, result) {
+          // result == true
+          if (result == true) {
+            res.render("secrets");
+          } else {
+            res.send("Password is incorrect, please try again");
+          }
+        });
+        // if (user.password === password) {
+        //   res.render("secrets");
+        // } else {
+        //   res.send("Password is incorrect, please try again");
+        // }
       } else {
         res.send("There is no user with that username");
       }
